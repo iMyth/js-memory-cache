@@ -1,11 +1,17 @@
-let _cache = Object.create(null)
+// import { JS_CACHE_KEY } from '../config.js'
+
+let _cache = {}
 let _hitCount = 0
 let _missCount = 0
 let _size = 0
 let _debug = false
 
 export class Cache {
-  put (key, value, time = 60000, timeoutCallback) {
+  constructor() {
+    // TODO
+  }
+
+  put(key, value, time = 600000, timeoutCallback) {
     _debug && console.log('caching: %s = %j (@%s)', key, value, time)
 
     let oldRecord = _cache[key]
@@ -22,7 +28,7 @@ export class Cache {
 
     if (!isNaN(record.expire)) {
       record.timeout = setTimeout(() => {
-        _del(key)
+        this._del(key)
         if (timeoutCallback) {
           timeoutCallback(key, value)
         }
@@ -34,7 +40,7 @@ export class Cache {
     return value
   }
 
-  del (key) {
+  del(key) {
     let canDelete = true
 
     let oldRecord = _cache[key]
@@ -48,18 +54,18 @@ export class Cache {
     }
 
     if (canDelete) {
-      _del(key)
+      this._del(key)
     }
 
     return canDelete
   }
 
-  _del (key) {
+  _del(key) {
     _size--
     delete _cache[key]
   }
 
-  reset () {
+  reset() {
     for (let key in _cache) {
       clearTimeout(_cache[key].timeout)
     }
@@ -71,11 +77,12 @@ export class Cache {
     }
   }
 
-  get (key) {
+  get(key) {
     let data = _cache[key]
     if (typeof data !== 'undefined') {
       if (isNaN(data.expire) || data.expire >= Date.now()) {
         _debug && _hitCount++
+        console.log('hit:', key)
         return data.value
       } else {
         _debug && _missCount++
@@ -88,27 +95,62 @@ export class Cache {
     return null
   }
 
-  size () {
+  size() {
     return _size
   }
 
-  memsize () {
+  memsize() {
     return Object.keys(_cache).length
   }
 
-  debug (bool) {
+  debug(bool) {
     _debug = bool
   }
 
-  hits () {
+  hits() {
     return _hitCount
   }
 
-  misses () {
+  misses() {
     return _missCount
   }
 
-  keys () {
+  keys() {
     return Object.keys(_cache)
   }
+
+  unserialize() {
+    // TODO
+    console.log('unserialize: %j', _cache)
+  }
+
+  serialize(jsonToImport) {
+    let cacheToImport = {}
+    if (jsonToImport) {
+      cacheToImport = JSON.parse(jsonToImport)
+    }
+    let currTime = Date.now()
+
+    for (let key in cacheToImport) {
+      if (!cacheToImport.hasOwnProperty(key)) {
+        continue
+      }
+      let record = cacheToImport[key]
+      let remainingTime = record.expire - currTime
+
+      if (remainingTime <= 0) {
+        this.del(key)
+        continue
+      }
+
+      remainingTime = remainingTime > 0 ? remainingTime : undefined
+      this.put(key, record.value, remainingTime)
+    }
+
+    return this.size()
+  }
 }
+
+let cache = new Cache()
+
+export default cache
